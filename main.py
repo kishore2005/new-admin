@@ -1,77 +1,22 @@
-import flet as ft
 import sqlitecloud
-import threading
-import time
+import flet as ft
 
-def create_users_table():
+# Step 1: Set up the database
+def setup_database():
     conn = sqlitecloud.connect("sqlitecloud://ce3yvllesk.sqlite.cloud:8860/gas?apikey=kOt8yvfwRbBFka2FXT1Q1ybJKaDEtzTya3SWEGzFbvE")
     cursor = conn.cursor()
     cursor.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT NOT NULL UNIQUE,
-            password TEXT NOT NULL
+        CREATE TABLE IF NOT EXISTS products (
+            id INTEGER PRIMARY KEY,
+            image TEXT,
+            name TEXT,
+            price TEXT
         )
     ''')
     conn.commit()
     conn.close()
 
-def create_password_options_table():
-    conn = sqlitecloud.connect("sqlitecloud://ce3yvllesk.sqlite.cloud:8860/gas?apikey=kOt8yvfwRbBFka2FXT1Q1ybJKaDEtzTya3SWEGzFbvE")
-    cursor = conn.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS password_options (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            option TEXT NOT NULL UNIQUE
-        )
-    ''')
-    cursor.execute('''
-        INSERT OR IGNORE INTO password_options (option) VALUES
-        ('compound 1'),
-        ('compound 2'),
-        ('compound 3')
-    ''')
-    conn.commit()
-    conn.close()
-
-def drop_bookings_table():
-    conn = sqlitecloud.connect("sqlitecloud://ce3yvllesk.sqlite.cloud:8860/gas?apikey=kOt8yvfwRbBFka2FXT1Q1ybJKaDEtzTya3SWEGzFbvE")
-    cursor = conn.cursor()
-    cursor.execute('DROP TABLE IF EXISTS bookings')
-    conn.commit()
-    conn.close()
-
-def create_bookings_table():
-    conn = sqlitecloud.connect("sqlitecloud://ce3yvllesk.sqlite.cloud:8860/gas?apikey=kOt8yvfwRbBFka2FXT1Q1ybJKaDEtzTya3SWEGzFbvE")
-    cursor = conn.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS bookings (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
-            product_id INTEGER NOT NULL,
-            status TEXT NOT NULL DEFAULT 'Processing',
-            FOREIGN KEY (user_id) REFERENCES users(id),
-            FOREIGN KEY (product_id) REFERENCES products(id)
-        )
-    ''')
-    conn.commit()
-    conn.close()
-
-def fetch_password_options():
-    conn = sqlitecloud.connect("sqlitecloud://ce3yvllesk.sqlite.cloud:8860/gas?apikey=kOt8yvfwRbBFka2FXT1Q1ybJKaDEtzTya3SWEGzFbvE")
-    cursor = conn.cursor()
-    cursor.execute('SELECT option FROM password_options')
-    options = cursor.fetchall()
-    conn.close()
-    return [option[0] for option in options]
-
-def add_password_option(option):
-    conn = sqlitecloud.connect("sqlitecloud://ce3yvllesk.sqlite.cloud:8860/gas?apikey=kOt8yvfwRbBFka2FXT1Q1ybJKaDEtzTya3SWEGzFbvE")
-    cursor = conn.cursor()
-    cursor.execute('INSERT OR IGNORE INTO password_options (option) VALUES (?)', (option,))
-    conn.commit()
-    conn.close()
-
+# Step 2: Fetch data from the database
 def fetch_products():
     conn = sqlitecloud.connect("sqlitecloud://ce3yvllesk.sqlite.cloud:8860/gas?apikey=kOt8yvfwRbBFka2FXT1Q1ybJKaDEtzTya3SWEGzFbvE")
     cursor = conn.cursor()
@@ -80,177 +25,129 @@ def fetch_products():
     conn.close()
     return products
 
-def signup(username, password):
+# Step 3: Insert data into the database
+def insert_product(image, name, price):
     conn = sqlitecloud.connect("sqlitecloud://ce3yvllesk.sqlite.cloud:8860/gas?apikey=kOt8yvfwRbBFka2FXT1Q1ybJKaDEtzTya3SWEGzFbvE")
     cursor = conn.cursor()
-    cursor.execute('INSERT INTO users (username, password) VALUES (?, ?)', (username, password))
+    cursor.execute('INSERT INTO products (image, name, price) VALUES (?, ?, ?)', (image, name, price))
     conn.commit()
     conn.close()
 
-def signin(username, password):
+# Step 4: Update data in the database
+def update_product(product_id, image, name, price):
     conn = sqlitecloud.connect("sqlitecloud://ce3yvllesk.sqlite.cloud:8860/gas?apikey=kOt8yvfwRbBFka2FXT1Q1ybJKaDEtzTya3SWEGzFbvE")
     cursor = conn.cursor()
-    cursor.execute('SELECT * FROM users WHERE username = ? AND password = ?', (username, password))
-    user = cursor.fetchone()
-    conn.close()
-    return user
-
-def book_product(user_id, product_id):
-    conn = sqlitecloud.connect("sqlitecloud://ce3yvllesk.sqlite.cloud:8860/gas?apikey=kOt8yvfwRbBFka2FXT1Q1ybJKaDEtzTya3SWEGzFbvE")
-    cursor = conn.cursor()
-    cursor.execute('INSERT INTO bookings (user_id, product_id, status) VALUES (?, ?, ?)', (user_id, product_id, 'Processing'))
+    cursor.execute('UPDATE products SET image = ?, name = ?, price = ? WHERE id = ?', (image, name, price, product_id))
     conn.commit()
     conn.close()
 
-def update_booking_status(booking_id, status):
+# Step 5: Delete data from the database
+def delete_product(product_id):
     conn = sqlitecloud.connect("sqlitecloud://ce3yvllesk.sqlite.cloud:8860/gas?apikey=kOt8yvfwRbBFka2FXT1Q1ybJKaDEtzTya3SWEGzFbvE")
     cursor = conn.cursor()
-    cursor.execute('UPDATE bookings SET status = ? WHERE id = ?', (status, booking_id))
+    cursor.execute('DELETE FROM products WHERE id = ?', (product_id,))
     conn.commit()
     conn.close()
 
-def fetch_bookings(user_id):
-    conn = sqlitecloud.connect("sqlitecloud://ce3yvllesk.sqlite.cloud:8860/gas?apikey=kOt8yvfwRbBFka2FXT1Q1ybJKaDEtzTya3SWEGzFbvE")
-    cursor = conn.cursor()
-    cursor.execute('SELECT product_id, status FROM bookings WHERE user_id = ?', (user_id,))
-    bookings = cursor.fetchall()
-    conn.close()
-    return bookings
-
-def show_products(page, user):
-    products = fetch_products()
-    bookings = fetch_bookings(user[0])
-    booking_dict = {booking[0]: booking[1] for booking in bookings}
-    product_containers = []
-
-    for product in products:
-        product_id, product_image_url, product_name, product_price = product
-        status = booking_dict.get(product_id)
-
-        def on_book(e, product_id=product_id, product_name=product_name):
-            book_product(user[0], product_id)
-            page.snack_bar = ft.SnackBar(ft.Text(f"Product {product_name} booked successfully!"), open=True)
-            refresh_data(page, user)
-
-        product_details = [
-            ft.Image(src=product_image_url, width=300, height=300),
-            ft.Text(product_name, size=30, weight=ft.FontWeight.BOLD, text_align=ft.TextAlign.CENTER),
-            ft.Text(f"₹{product_price}", size=25, color=ft.colors.GREEN, text_align=ft.TextAlign.CENTER),
-        ]
-
-        if status:
-            product_details.append(ft.Text(f"Status: {status}", size=20, color=ft.colors.BLUE, text_align=ft.TextAlign.CENTER))
-
-        product_details.append(ft.ElevatedButton(text="Book Now", on_click=on_book, style=ft.ButtonStyle(bgcolor=ft.colors.BLUE, color=ft.colors.WHITE, shape=ft.RoundedRectangleBorder(radius=10), elevation=5, padding=16)))
-
-
-        product_container = ft.Container(
-            content=ft.Card(
-                content=ft.Column(
-                    product_details,
-                    alignment=ft.MainAxisAlignment.CENTER,
-                    spacing=10,
-                ),
-                elevation=5,
-            ),
-            padding=30,
-            alignment=ft.alignment.center
-        )
-
-        product_containers.append(product_container)
-
-    scrollable_column = ft.Column(
-        controls=product_containers,
-        scroll=ft.ScrollMode.AUTO,
-        expand=True,
-        spacing=10,
-        alignment=ft.MainAxisAlignment.START,
-    )
-
-    page.add(scrollable_column)
-
-def refresh_data(page, user):
-    page.clean()
-    show_products(page, user)
-
+# Step 6: Display data in Flet
 def main(page: ft.Page):
-    page.title ="GAS BOOKING"
-    page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
-    page.vertical_alignment = ft.MainAxisAlignment.CENTER
-
-  
-
+    # Add an AppBar with a metallic look
     page.appbar = ft.AppBar(
-        title=ft.Text("GAS BOOKING"),
+        title=ft.Text("ADMIN"),
         center_title=True,
-        bgcolor="#000000"
+        bgcolor="#000000"  # Silver metallic color
     )
 
-    def on_signin(e):
-        username = username_input.value
-        password = password_dropdown.value
-        user = signin(username, password)
-        if user:
-            page.client_storage.set("user", {"username": username, "password": password})
-            page.clean()
-            show_products(page, user)
-            # Start the polling mechanism
-            def poll():
-                while True:
-                    refresh_data(page, user)
-                    time.sleep(60)  # Poll every 10 seconds
-            threading.Thread(target=poll, daemon=True).start()
-        else:
-            page.snack_bar = ft.SnackBar(ft.Text("Invalid username or password"), open=True)
+    selected_product_id = None
 
-    def on_signup(e):
-        username = username_input.value
-        password = password_dropdown.value
-        signup(username, password)
-        page.snack_bar = ft.SnackBar(ft.Text("Signup successful! Please sign in."), open=True)
+    def add_product(e):
+        insert_product(image_input.value, name_input.value, price_input.value)
+        image_input.value = ""
+        name_input.value = ""
+        price_input.value = ""
+        page.update()
+        load_data()
 
-    username_input = ft.TextField(label="Username")
-    password_options = fetch_password_options()
-    password_dropdown = ft.Dropdown(
-        label="Password",
-        options=[ft.dropdown.Option(option) for option in password_options]
-    )
+    def load_data():
+        products = fetch_products()
+        table.rows.clear()
+        for product in products:
+            table.rows.append(
+                ft.DataRow(
+                    cells=[
+                        ft.DataCell(ft.Image(src=product[1], width=50, height=50)),
+                        ft.DataCell(ft.Text(product[2])),
+                        ft.DataCell(ft.Text(product[3])),
+                        ft.DataCell(ft.Row([
+                            ft.ElevatedButton(text="Edit", on_click=lambda e, product=product: edit_product(product)),
+                            ft.ElevatedButton(text="Delete", on_click=lambda e, product_id=product[0]: delete_product_info(product_id))
+                        ]))
+                    ]
+                )
+            )
+        
+        page.update()
 
-    signin_button = ft.ElevatedButton(text="Sign In", on_click=on_signin)
-    signup_button = ft.ElevatedButton(text="Sign Up", on_click=on_signup)
+    def edit_product(product):
+        nonlocal selected_product_id
+        selected_product_id = product[0]
+        image_input.value = product[1]
+        name_input.value = product[2]
+        price_input.value = product[3]
+        page.update()
 
-    auth_form = ft.Column(
-        controls=[
-            username_input,
-            password_dropdown,
-            signin_button,
-            signup_button,
+    def update_product_info(e):
+        if selected_product_id is not None:
+            update_product(selected_product_id, image_input.value, name_input.value, price_input.value)
+            image_input.value = ""
+            name_input.value = ""
+            price_input.value = ""
+            page.update()
+            load_data()
+
+    def delete_product_info(product_id):
+        delete_product(product_id)
+        page.update()
+        load_data()
+
+    image_input = ft.TextField(label="Product Image URL")
+    name_input = ft.TextField(label="Product Name")
+    price_input = ft.TextField(label="Product Price")
+    add_button = ft.ElevatedButton(text="Add Product", on_click=add_product)
+    update_button = ft.ElevatedButton(text="Update Product", on_click=update_product_info)
+
+    table = ft.DataTable(
+        columns=[
+            ft.DataColumn(ft.Text("Image")),
+            ft.DataColumn(ft.Text("Name")),
+            ft.DataColumn(ft.Text("Price")),
+            ft.DataColumn(ft.Text("Actions")),
         ],
-        alignment=ft.MainAxisAlignment.CENTER,
-        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-        spacing=20,
+        rows=[]
     )
 
-    stored_user = page.client_storage.get("user")
-    
-    if stored_user:
-        user = signin(stored_user["username"], stored_user["password"])
-        if user:
-            show_products(page, user)
-            # Start the polling mechanism
-            def poll():
-                while True:
-                    refresh_data(page, user)
-                    time.sleep(60)  # Poll every 10 seconds
-            threading.Thread(target=poll, daemon=True).start()
-        else:
-            page.add(auth_form)
-    else:
-        page.add(auth_form)
+    # Wrap the product table in a ListView to enable scrolling
+    product_list_view = ft.ListView(
+        controls=[table],
+        expand=True
+    )
 
-create_users_table()
-create_password_options_table()
-drop_bookings_table()  # Drop the existing bookings table if it exists
-create_bookings_table()
+    # Wrap the content in a Column with scroll mode inside a Container
+    scrollable_content = ft.Container(
+        content=ft.Column(
+            [
+                image_input, name_input, price_input, add_button, update_button, product_list_view
+            ],
+            scroll=ft.ScrollMode.AUTO
+        ),
+        expand=True
+    )
 
-ft.app(target=main, view=ft.AppView.WEB_BROWSER)
+    page.add(scrollable_content)
+    load_data()
+
+# Run the setup function to create the database
+setup_database()
+
+# Run the Flet app
+ft.app(target=main)
